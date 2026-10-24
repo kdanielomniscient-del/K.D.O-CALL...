@@ -441,7 +441,14 @@ async function toggleRecording(){
     try{
       const stream = await navigator.mediaDevices.getUserMedia({audio:true});
       audioChunks = [];
-      mediaRecorder = new MediaRecorder(stream, {audioBitsPerSecond: 32000});
+      const supportedTypes = ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus','audio/aac','audio/mpeg'];
+      let chosenType = '';
+      for(const t of supportedTypes){
+        if(window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)){ chosenType = t; break; }
+      }
+      mediaRecorder = chosenType
+        ? new MediaRecorder(stream, {mimeType: chosenType, audioBitsPerSecond: 32000})
+        : new MediaRecorder(stream);
       mediaRecorder.ondataavailable = e=> audioChunks.push(e.data);
       mediaRecorder.onstop = async ()=>{
         stream.getTracks().forEach(t=>t.stop());
@@ -718,7 +725,7 @@ function startCall(type){
   document.getElementById('call-overlay').classList.add('show');
   try{
     const appID = 1941270213;
-    const serverSecret = "b91e1d71082c8f105a624e4ce056ea42f4c6898f";
+    const serverSecret = "6c4a7c5947be39a06f3ce851f92017f3";
     const roomID = currentRoom;
     const userID = me.phone;
     const userName = me.name;
