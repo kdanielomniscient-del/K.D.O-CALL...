@@ -629,9 +629,19 @@ function openChat(peerPhone, peerName, groupRoomId, isGroup){
       box.querySelectorAll('audio[data-src]').forEach(audioEl=>{
         const dUrl = audioEl.getAttribute('data-src');
         audioEl.removeAttribute('data-src');
+        if(!dUrl || dUrl.length < 100){
+          audioEl.insertAdjacentHTML('afterend', '<span style="color:var(--call);font-size:11px;display:block">⚠ fichier audio vide ou manquant</span>');
+          return;
+        }
         fetch(dUrl).then(r=>r.blob()).then(blob=>{
-          audioEl.src = URL.createObjectURL(blob);
-        }).catch(()=>{});
+          const url = URL.createObjectURL(blob);
+          audioEl.src = url;
+          audioEl.onerror = function(){
+            audioEl.insertAdjacentHTML('afterend', '<span style="color:var(--call);font-size:11px;display:block">⚠ format audio non lisible (code: '+(audioEl.error?audioEl.error.code:'?')+')</span>');
+          };
+        }).catch(err=>{
+          audioEl.insertAdjacentHTML('afterend', '<span style="color:var(--call);font-size:11px;display:block">⚠ erreur de conversion : '+err.message+'</span>');
+        });
       });
       if(toMarkRead.length){
         const batch = db.batch();
