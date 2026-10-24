@@ -621,11 +621,18 @@ function openChat(peerPhone, peerName, groupRoomId, isGroup){
         const body = m.type === 'image'
           ? `<div class="bubble img-bubble ${m.from===me.phone?'me':'them'}">${senderLine}<img src="${m.data}">${tick}${delBtn}</div>`
           : m.type === 'audio'
-          ? `<div class="bubble ${m.from===me.phone?'me':'them'}">${senderLine}🎤<audio controls src="${m.data}"></audio>${tick}${delBtn}</div>`
+          ? `<div class="bubble ${m.from===me.phone?'me':'them'}">${senderLine}🎤<audio controls preload="metadata" data-src="${m.data}"></audio>${tick}${delBtn}</div>`
           : `<div class="bubble ${m.from===me.phone?'me':'them'}">${senderLine}${escapeHtml(m.text)} ${tick}${delBtn}</div>`;
         return body;
       }).join('') : '<div class="empty">Dis bonjour 👋</div>';
       box.scrollTop = box.scrollHeight;
+      box.querySelectorAll('audio[data-src]').forEach(audioEl=>{
+        const dUrl = audioEl.getAttribute('data-src');
+        audioEl.removeAttribute('data-src');
+        fetch(dUrl).then(r=>r.blob()).then(blob=>{
+          audioEl.src = URL.createObjectURL(blob);
+        }).catch(()=>{});
+      });
       if(toMarkRead.length){
         const batch = db.batch();
         toMarkRead.forEach(id=> batch.update(msgsRef.doc(id), {read:true}));
@@ -711,7 +718,7 @@ function sendPhoto(event){
 
 let zegoInstance = null;
 
-function startCall(type){
+async function startCall(type){
   if(!currentRoom || currentIsGroup){
     alert("Les appels ne sont disponibles que pour les discussions à deux pour l'instant.");
     return;
@@ -723,6 +730,16 @@ function startCall(type){
   const container = document.getElementById('zego-call-container');
   container.innerHTML = '<div style="color:#fff;text-align:center;padding-top:42vh;font-family:inherit;font-size:15px">Connexion en cours…</div>';
   document.getElementById('call-overlay').classList.add('show');
+  if(type === 'video'){
+    try{
+      const testStream = await navigator.mediaDevices.getUserMedia({video:true});
+      testStream.getTracks().forEach(t=>t.stop());
+    }catch(camErr){
+      alert("Impossible d'accéder à la caméra : " + camErr.message + ". Vérifie que l'autorisation caméra est activée pour ce site dans les paramètres du navigateur, et qu'aucune autre application ne l'utilise déjà.");
+      endCall();
+      return;
+    }
+  }
   try{
     const appID = 1941270213;
     const serverSecret = "6c4a7c5947be39a06f3ce851f92017f3";
