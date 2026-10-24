@@ -240,7 +240,7 @@
     <div class="chat-top">
       <button class="back" onclick="show('screen-list')">←</button>
       <div class="avatar" id="chat-avatar"></div>
-      <div><b id="chat-name"></b></div>
+      <div><b id="chat-name"></b><div id="chat-roomid" style="font-size:10px;color:var(--muted)"></div></div>
       <div class="spacer"></div>
       <button class="icon-btn" onclick="startCall('voice')" title="Appel vocal">📞</button>
       <button class="icon-btn" onclick="startCall('video')" title="Appel vidéo">📹</button>
@@ -596,6 +596,7 @@ function openChat(peerPhone, peerName, groupRoomId, isGroup){
   currentIsGroup = !!isGroup;
   document.getElementById('chat-name').textContent = peerName;
   document.getElementById('chat-avatar').textContent = isGroup ? '👥' : initials(peerName);
+  document.getElementById('chat-roomid').textContent = 'ID: ' + currentRoom;
   roomNames = null;
   if(isGroup){
     db.collection('rooms').doc(currentRoom).get().then(d=>{ if(d.exists) roomNames = d.data().names || {}; });
@@ -727,8 +728,8 @@ async function sendMsg(){
   };
   roomRef.collection('messages').add({
     from: me.phone, text, read:false, ts: firebase.firestore.FieldValue.serverTimestamp()
-  });
-  roomRef.set({ ...extra, lastMessage: text, lastTime: new Date().toISOString() }, {merge:true});
+  }).catch(err=>{ alert("Erreur d'envoi du message : " + err.message); });
+  roomRef.set({ ...extra, lastMessage: text, lastTime: new Date().toISOString() }, {merge:true}).catch(()=>{});
 }
 
 function sendPhoto(event){
