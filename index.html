@@ -95,7 +95,11 @@
   .composer input[type=file]{display:none}
   .bubble img{max-width:100%;border-radius:12px;display:block}
   .bubble.img-bubble{padding:4px}
-  .bubble audio{width:200px;max-width:100%;height:36px;display:block;margin-top:2px}
+  .audio-player{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.18);border-radius:999px;
+    padding:6px 10px;margin-top:3px;max-width:180px}
+  .audio-play-btn{width:28px;height:28px;border-radius:50%;border:none;background:var(--amber);
+    color:#1B1507;font-size:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0}
+  .audio-duration{font-size:12px;color:var(--muted);flex:1}
   #mic-btn.recording{background:var(--call);color:#fff}
   .tick{font-size:11px;color:var(--muted);margin-left:4px}
   .bubble.me .tick{color:var(--amber)}
@@ -621,26 +625,44 @@ function openChat(peerPhone, peerName, groupRoomId, isGroup){
         const body = m.type === 'image'
           ? `<div class="bubble img-bubble ${m.from===me.phone?'me':'them'}">${senderLine}<img src="${m.data}">${tick}${delBtn}</div>`
           : m.type === 'audio'
-          ? `<div class="bubble ${m.from===me.phone?'me':'them'}">${senderLine}🎤<audio controls preload="metadata" data-src="${m.data}"></audio>${tick}${delBtn}</div>`
+          ? `<div class="bubble ${m.from===me.phone?'me':'them'}">${senderLine}<div class="audio-player" data-src="${m.data}"><button class="audio-play-btn" onclick="toggleAudioPlay(this)">▶</button><span class="audio-duration">--:--</span><audio preload="metadata"></audio></div>${tick}${delBtn}</div>`
           : `<div class="bubble ${m.from===me.phone?'me':'them'}">${senderLine}${escapeHtml(m.text)} ${tick}${delBtn}</div>`;
         return body;
       }).join('') : '<div class="empty">Dis bonjour 👋</div>';
       box.scrollTop = box.scrollHeight;
-      box.querySelectorAll('audio[data-src]').forEach(audioEl=>{
-        const dUrl = audioEl.getAttribute('data-src');
-        audioEl.removeAttribute('data-src');
+      box.querySelectorAll('.audio-player[data-src]').forEach(playerEl=>{
+        const dUrl = playerEl.getAttribute('data-src');
+        playerEl.removeAttribute('data-src');
+        const audioEl = playerEl.querySelector('audio');
+        const durEl = playerEl.querySelector('.audio-duration');
+        const btnEl = playerEl.querySelector('.audio-play-btn');
         if(!dUrl || dUrl.length < 100){
-          audioEl.insertAdjacentHTML('afterend', '<span style="color:var(--call);font-size:11px;display:block">⚠ fichier audio vide ou manquant</span>');
+          durEl.textContent = 'indisponible';
+          btnEl.disabled = true;
           return;
         }
         fetch(dUrl).then(r=>r.blob()).then(blob=>{
-          const url = URL.createObjectURL(blob);
-          audioEl.src = url;
-          audioEl.onerror = function(){
-            audioEl.insertAdjacentHTML('afterend', '<span style="color:var(--call);font-size:11px;display:block">⚠ format audio non lisible (code: '+(audioEl.error?audioEl.error.code:'?')+')</span>');
-          };
-        }).catch(err=>{
-          audioEl.insertAdjacentHTML('afterend', '<span style="color:var(--call);font-size:11px;display:block">⚠ erreur de conversion : '+err.message+'</span>');
+          audioEl.src = URL.createObjectURL(blob);
+          audioEl.addEventListener('loadedmetadata', ()=>{
+            if(isFinite(audioEl.duration)){
+              const mn = Math.floor(audioEl.duration/60), sc = Math.floor(audioEl.duration%60);
+              durEl.textContent = mn+':'+String(sc).padStart(2,'0');
+            }
+          });
+          audioEl.addEventListener('timeupdate', ()=>{
+            const mn = Math.floor(audioEl.currentTime/60), sc = Math.floor(audioEl.currentTime%60);
+            durEl.textContent = mn+':'+String(sc).padStart(2,'0');
+          });
+          audioEl.addEventListener('ended', ()=>{
+            btnEl.textContent = '▶';
+          });
+          audioEl.addEventListener('error', ()=>{
+            durEl.textContent = 'erreur lecture';
+            btnEl.disabled = true;
+          });
+        }).catch(()=>{
+          durEl.textContent = 'erreur';
+          btnEl.disabled = true;
         });
       });
       if(toMarkRead.length){
@@ -651,6 +673,20 @@ function openChat(peerPhone, peerName, groupRoomId, isGroup){
     }, err=>{
       box.innerHTML = `<div class="empty">Erreur de connexion : ${err.message}</div>`;
     });
+}
+
+function toggleAudioPlay(btn){
+  const audioEl = btn.parentElement.querySelector('audio');
+  if(!audioEl || !audioEl.src) return;
+  if(audioEl.paused){
+    document.querySelectorAll('.messages audio').forEach(a=>{ if(a!==audioEl) a.pause(); });
+    document.querySelectorAll('.audio-play-btn').forEach(b=>{ if(b!==btn) b.textContent = '▶'; });
+    audioEl.play();
+    btn.textContent = '⏸';
+  }else{
+    audioEl.pause();
+    btn.textContent = '▶';
+  }
 }
 
 function deleteMsg(msgId){
